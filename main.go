@@ -131,6 +131,67 @@ func main() {
 		http.ServeContent(w, r, name, time.Now(), f)
 	})
 
+	http.HandleFunc("/thumbnail", func(w http.ResponseWriter, r *http.Request) {
+		url := r.URL.Query().Get("url")
+		if url == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "url param needed")
+			return
+		}
+
+		h := hash(url)
+		name := h + ".jpg"
+		file := tmp + "/" + name
+
+		if _, err := os.Stat(file); err == nil {
+			log.Println("already exist")
+			f, err := os.Open(file)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprintf(w, "cannot open file: %s", err.Error())
+				return
+			}
+			defer f.Close()
+			http.ServeContent(w, r, name, time.Now(), f)
+			return
+		}
+
+		log.Println("transcode", url, "to", file)
+		args := []string{
+			"-y",
+			"-i", url,
+			"-frames:v", "1",
+			file,
+		}
+
+		ffmpeg := exec.Command(
+			getEnv("FFMPEG_PATH", "ffmpeg"),
+			args...,
+		)
+
+		if err := ffmpeg.Start(); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, "cannot start ffmpeg: %s", err.Error())
+			return
+		}
+
+		if err := ffmpeg.Wait(); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, "cannot open file: %s", err.Error())
+			return
+		}
+
+		log.Println("serve file")
+		f, err := os.Open(file)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, "cannot open file: %s", err.Error())
+			return
+		}
+		defer f.Close()
+		http.ServeContent(w, r, name, time.Now(), f)
+	})
+
 	log.Fatal(http.ListenAndServe(getEnv("LISTEN_PORT", ":8080"), nil))
 }
 
