@@ -15,3 +15,4 @@ Everything is optional
 
 - `/` for health checks
 - `/transcode?url=http%3A%2F%2Fgoodone.fr%2Fhls.m3u8` to transcode the HLS to a sing mp4 file
+- `/thumbnail?url=http%3A%2F%2Fgoodone.fr%2Fhls.m3u8` to get the first frame in .jpg from video
