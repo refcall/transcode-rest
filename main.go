@@ -195,6 +195,8 @@ func main() {
 	})
 
 	http.HandleFunc("/pdf/info", func(w http.ResponseWriter, r *http.Request) {
+		//TODO download pdf file
+		//TODO store it in cash, look at video L148 ++
 
 	})
 
@@ -211,6 +213,8 @@ func main() {
 			fmt.Fprintf(w, "page param needed")
 			return
 		}
+
+		//TODO get the pdf from cash
 
 		res, err := http.Get(url)
 		if err != nil {
