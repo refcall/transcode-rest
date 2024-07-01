@@ -210,7 +210,7 @@ func main() {
 		}
 		defer res.Body.Close()
 
-		out, err := os.Create("doc.pdf")
+		out, err := os.Create(hash(url) + ".pdf")
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -274,6 +274,19 @@ func main() {
 		h := hash(url)
 		name := h + ".jpg"
 		file := tmp + "/" + name
+
+		if _, err := os.Stat(file); err == nil {
+			log.Println("already exist")
+			f, err := os.Open(file)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprintf(w, "cannot open file: %s", err.Error())
+				return
+			}
+			defer f.Close()
+			http.ServeContent(w, r, name, time.Now(), f)
+			return
+		}
 
 		args := []string{
 			"pdfload", out.Name(), file,
