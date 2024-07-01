@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -131,7 +133,7 @@ func main() {
 		http.ServeContent(w, r, name, time.Now(), f)
 	})
 
-	http.HandleFunc("/thumbnail", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/thumbnail/video", func(w http.ResponseWriter, r *http.Request) {
 		url := r.URL.Query().Get("url")
 		if url == "" {
 			w.WriteHeader(http.StatusBadRequest)
@@ -176,6 +178,93 @@ func main() {
 		}
 
 		if err := ffmpeg.Wait(); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, "cannot open file: %s", err.Error())
+			return
+		}
+
+		log.Println("serve file")
+		f, err := os.Open(file)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, "cannot open file: %s", err.Error())
+			return
+		}
+		defer f.Close()
+		http.ServeContent(w, r, name, time.Now(), f)
+	})
+
+	http.HandleFunc("/pdf/info", func(w http.ResponseWriter, r *http.Request) {
+
+	})
+
+	http.HandleFunc("/thumbnail/pdf", func(w http.ResponseWriter, r *http.Request) {
+		url := r.URL.Query().Get("url")
+		if url == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "url param needed")
+			return
+		}
+		page := r.URL.Query().Get("page")
+		if url == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "page param needed")
+			return
+		}
+
+		res, err := http.Get(url)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer res.Body.Close()
+
+		out, err := os.Create("doc.pdf")
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer out.Close()
+
+		_, err = io.Copy(out, res.Body)
+
+		log.Println("distant pdf ", url, " saved to ", out)
+
+		h := hash(url)
+		name := h + ".jpg"
+		file := tmp + "/" + name
+
+		getPagesCmd := exec.Command(getEnv("VIPS_HEADER_PATH", "vipsheader"), "-f", "n-pages", out.Name())
+		pagesOutput, err := getPagesCmd.Output()
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, "cannot get page count: %s", err.Error())
+			return
+		}
+		numPages, err := strconv.Atoi(strings.TrimSpace(string(pagesOutput)))
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, "invalid page count: %s", err.Error())
+			return
+		}
+
+		log.Printf("Number of pages: %d\n", numPages)
+
+		args := []string{
+			"pdfload", out.Name(), file,
+			"--page", page,
+			"--dpi", "72",
+		}
+		vips := exec.Command(
+			getEnv("VIPS_PATH", "vips"),
+			args...,
+		)
+
+		if err := vips.Start(); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, "cannot start vips: %s", err.Error())
+			return
+		}
+
+		if err := vips.Wait(); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, "cannot open file: %s", err.Error())
 			return
