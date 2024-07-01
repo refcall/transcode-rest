@@ -195,7 +195,46 @@ func main() {
 	})
 
 	http.HandleFunc("/pdf/info", func(w http.ResponseWriter, r *http.Request) {
-		//TODO download pdf file
+		//TODO download pdf file here vvvv
+
+		url := r.URL.Query().Get("url")
+		if url == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "url param needed")
+			return
+		}
+
+		res, err := http.Get(url)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer res.Body.Close()
+
+		out, err := os.Create("doc.pdf")
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer out.Close()
+
+		_, err = io.Copy(out, res.Body)
+
+		log.Println("distant pdf ", url, " saved to ", out)
+
+		getPagesCmd := exec.Command(getEnv("VIPS_HEADER_PATH", "vipsheader"), "-f", "n-pages", out.Name())
+		pagesOutput, err := getPagesCmd.Output()
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, "cannot get page count: %s", err.Error())
+			return
+		}
+		numPages, err := strconv.Atoi(strings.TrimSpace(string(pagesOutput)))
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, "invalid page count: %s", err.Error())
+			return
+		}
+
+		log.Printf("Number of pages: %d\n", numPages)
 		//TODO store it in cash, look at video L148 ++
 
 	})
@@ -235,22 +274,6 @@ func main() {
 		h := hash(url)
 		name := h + ".jpg"
 		file := tmp + "/" + name
-
-		getPagesCmd := exec.Command(getEnv("VIPS_HEADER_PATH", "vipsheader"), "-f", "n-pages", out.Name())
-		pagesOutput, err := getPagesCmd.Output()
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "cannot get page count: %s", err.Error())
-			return
-		}
-		numPages, err := strconv.Atoi(strings.TrimSpace(string(pagesOutput)))
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "invalid page count: %s", err.Error())
-			return
-		}
-
-		log.Printf("Number of pages: %d\n", numPages)
 
 		args := []string{
 			"pdfload", out.Name(), file,
