@@ -260,8 +260,8 @@ func main() {
 
 		out := &os.File{}
 		if _, err := os.Stat(pdfFile); err == nil {
-			log.Println("already exist")
-			out, err = os.Open(hash(url) + ".pdf")
+			log.Println("exist")
+			out, err = os.Open(pdfFile)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				fmt.Fprintf(w, "cannot open file: %s", err.Error())
@@ -302,7 +302,7 @@ func main() {
 
 			http.ServeContent(w, r, imageFile, time.Now(), f)
 		} else {
-			fmt.Fprintf(w, "file dose not existe: %s", err.Error())
+			fmt.Fprintf(w, "error: %s", err.Error())
 		}
 	})
 
