@@ -295,7 +295,7 @@ func main() {
 			f, err := os.Open(imageFile)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Fprintf(w, "cannot open file: %s", err.Error())
+				fmt.Fprintf(w, "vips cannot open file: %s", err.Error())
 				return
 			}
 			defer f.Close()
