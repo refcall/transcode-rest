@@ -236,7 +236,7 @@ func main() {
 			return
 		}
 
-		log.Printf("Number of pages: %d\n", numPages)
+		fmt.Fprintf(w, "Number of pages: %d\n", numPages)
 
 	})
 
