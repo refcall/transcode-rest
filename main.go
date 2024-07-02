@@ -1,5 +1,6 @@
 package main
 
+import "C"
 import (
 	"encoding/hex"
 	"encoding/json"
@@ -25,6 +26,11 @@ var (
 	// BuildTime is set at compilation
 	BuildTime = "unknown"
 )
+
+type PdfInfo struct {
+	Pages int
+	URL   string
+}
 
 func main() {
 	fmt.Println("transcode-rest")
@@ -133,7 +139,7 @@ func main() {
 		http.ServeContent(w, r, name, time.Now(), f)
 	})
 
-	http.HandleFunc("/thumbnail/video", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/video/thumbnail", func(w http.ResponseWriter, r *http.Request) {
 		url := r.URL.Query().Get("url")
 		if url == "" {
 			w.WriteHeader(http.StatusBadRequest)
@@ -195,7 +201,6 @@ func main() {
 	})
 
 	http.HandleFunc("/pdf/info", func(w http.ResponseWriter, r *http.Request) {
-
 		url := r.URL.Query().Get("url")
 		if url == "" {
 			w.WriteHeader(http.StatusBadRequest)
@@ -236,11 +241,19 @@ func main() {
 			return
 		}
 
-		fmt.Fprintf(w, "Number of pages: %d\n", numPages)
-
+		pdfInfo := PdfInfo{
+			Pages: numPages,
+			URL:   url,
+		}
+		w.Header().Set("Content-Type", "application/json")
+		err = json.NewEncoder(w).Encode(pdfInfo)
+		if err != nil {
+			http.Error(w, "Failed to encode JSON: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 	})
 
-	http.HandleFunc("/thumbnail/pdf", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/pdf/thumbnail", func(w http.ResponseWriter, r *http.Request) {
 		url := r.URL.Query().Get("url")
 		if url == "" {
 			w.WriteHeader(http.StatusBadRequest)
