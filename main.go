@@ -195,7 +195,6 @@ func main() {
 	})
 
 	http.HandleFunc("/pdf/info", func(w http.ResponseWriter, r *http.Request) {
-		//TODO download pdf file here vvvv
 
 		url := r.URL.Query().Get("url")
 		if url == "" {
@@ -204,13 +203,16 @@ func main() {
 			return
 		}
 
+		h := hash(url)
+		pdfFile := tmp + "/" + h + ".pdf"
+
 		res, err := http.Get(url)
 		if err != nil {
 			log.Fatal(err)
 		}
 		defer res.Body.Close()
 
-		out, err := os.Create(hash(url) + ".pdf")
+		out, err := os.Create(pdfFile)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -235,7 +237,6 @@ func main() {
 		}
 
 		log.Printf("Number of pages: %d\n", numPages)
-		//TODO store it in cash, look at video L148 ++
 
 	})
 
@@ -247,78 +248,62 @@ func main() {
 			return
 		}
 		page := r.URL.Query().Get("page")
-		if url == "" {
+		if page == "" {
 			w.WriteHeader(http.StatusBadRequest)
 			fmt.Fprintf(w, "page param needed")
 			return
 		}
 
-		//TODO get the pdf from cash
-
-		res, err := http.Get(url)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer res.Body.Close()
-
-		out, err := os.Create("doc.pdf")
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer out.Close()
-
-		_, err = io.Copy(out, res.Body)
-
-		log.Println("distant pdf ", url, " saved to ", out)
-
 		h := hash(url)
-		name := h + ".jpg"
-		file := tmp + "/" + name
+		pdfFile := tmp + "/" + h + ".pdf"
+		imageFile := tmp + "/" + h + ".jpg"
 
-		if _, err := os.Stat(file); err == nil {
+		out := &os.File{}
+		if _, err := os.Stat(pdfFile); err == nil {
 			log.Println("already exist")
-			f, err := os.Open(file)
+			out, err = os.Open(hash(url) + ".pdf")
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprintf(w, "cannot open file: %s", err.Error())
+				return
+			}
+			defer out.Close()
+
+			args := []string{
+				"pdfload", out.Name(), imageFile,
+				"--page", page,
+				"--dpi", "72",
+			}
+			vips := exec.Command(
+				getEnv("VIPS_PATH", "vips"),
+				args...,
+			)
+
+			if err := vips.Start(); err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprintf(w, "cannot start vips: %s", err.Error())
+				return
+			}
+
+			if err := vips.Wait(); err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprintf(w, "cannot open file: %s", err.Error())
+				return
+			}
+
+			log.Println("serve file")
+			f, err := os.Open(imageFile)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				fmt.Fprintf(w, "cannot open file: %s", err.Error())
 				return
 			}
 			defer f.Close()
-			http.ServeContent(w, r, name, time.Now(), f)
-			return
-		}
 
-		args := []string{
-			"pdfload", out.Name(), file,
-			"--page", page,
-			"--dpi", "72",
+			http.ServeContent(w, r, imageFile, time.Now(), f)
+		} else {
+			fmt.Fprintf(w, "file dose not existe: %s", err.Error())
 		}
-		vips := exec.Command(
-			getEnv("VIPS_PATH", "vips"),
-			args...,
-		)
-
-		if err := vips.Start(); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "cannot start vips: %s", err.Error())
-			return
-		}
-
-		if err := vips.Wait(); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "cannot open file: %s", err.Error())
-			return
-		}
-
-		log.Println("serve file")
-		f, err := os.Open(file)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "cannot open file: %s", err.Error())
-			return
-		}
-		defer f.Close()
-		http.ServeContent(w, r, name, time.Now(), f)
 	})
 
 	log.Fatal(http.ListenAndServe(getEnv("LISTEN_PORT", ":8080"), nil))
