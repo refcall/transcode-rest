@@ -256,7 +256,7 @@ func main() {
 
 		h := hash(url)
 		pdfFile := tmp + "/" + h + ".pdf"
-		imageFile := tmp + "/" + h + ".jpg"
+		imageFile := tmp + "/" + h + "_" + page + ".jpg"
 
 		out := &os.File{}
 		if _, err := os.Stat(pdfFile); err == nil {
@@ -272,7 +272,7 @@ func main() {
 			args := []string{
 				"pdfload", out.Name(), imageFile,
 				"--page", page,
-				"--dpi", "72",
+				"--dpi", "120",
 			}
 			vips := exec.Command(
 				getEnv("VIPS_PATH", "vips"),
