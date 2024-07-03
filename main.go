@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/davidbyttow/govips/v2/vips"
 	"hash/fnv"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -247,56 +248,43 @@ func main() {
 			fmt.Fprintf(w, "page param needed")
 			return
 		}
+		intPage, _ := strconv.Atoi(page)
 
-		h := hash(url)
-		pdfFile := tmp + "/" + h + ".pdf"
-		imageFile := tmp + "/" + h + "_" + page + ".jpg"
+		res, err := http.Get(url)
+		if err != nil {
+			fmt.Fprintf(w, "cannot get url body: %s", err.Error())
+			return
+		}
+		defer res.Body.Close()
 
-		out := &os.File{}
-		if _, err := os.Stat(pdfFile); err == nil {
-			log.Println("exist")
-			out, err = os.Open(pdfFile)
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Fprintf(w, "cannot open file: %s", err.Error())
-				return
-			}
-			defer out.Close()
+		bytesRes, err := io.ReadAll(res.Body)
+		if err != nil {
+			fmt.Fprintf(w, "cannot extract bytes from url body: %s", err.Error())
+			return
+		}
 
-			args := []string{
-				"pdfload", out.Name(), imageFile,
-				"--page", page,
-				"--dpi", "120",
-			}
-			vips := exec.Command(
-				getEnv("VIPS_PATH", "vips"),
-				args...,
-			)
+		ip := vips.NewImportParams()
+		ip.Page.Set(intPage)
 
-			if err := vips.Start(); err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Fprintf(w, "cannot start vips: %s", err.Error())
-				return
-			}
+		imageFile, err := vips.LoadImageFromBuffer(bytesRes, ip)
+		if err != nil {
+			fmt.Fprintf(w, "cannot load image file from url bytes and page: %s", err.Error())
+			return
+		}
 
-			if err := vips.Wait(); err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Fprintf(w, "cannot open file: %s", err.Error())
-				return
-			}
+		ep := vips.NewJpegExportParams()
+		ep.Quality = 120
 
-			log.Println("serve file")
-			f, err := os.Open(imageFile)
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Fprintf(w, "vips cannot open file: %s", err.Error())
-				return
-			}
-			defer f.Close()
-
-			http.ServeContent(w, r, imageFile, time.Now(), f)
-		} else {
-			fmt.Fprintf(w, "error: %s", err.Error())
+		out, _, err := imageFile.ExportJpeg(ep)
+		if err != nil {
+			fmt.Fprintf(w, "cannot export file to jpeg: %s", err.Error())
+			return
+		}
+		w.Header().Set("Content-Type", "image/jpeg")
+		w.Write(out)
+		if err != nil {
+			http.Error(w, "failed to convert pdf to jpeg: "+err.Error(), http.StatusInternalServerError)
+			return
 		}
 	})
 
