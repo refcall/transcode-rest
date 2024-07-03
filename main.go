@@ -265,6 +265,7 @@ func main() {
 
 		ip := vips.NewImportParams()
 		ip.Page.Set(intPage)
+		ip.Density.Set(120)
 
 		imageFile, err := vips.LoadImageFromBuffer(bytesRes, ip)
 		if err != nil {
@@ -273,7 +274,7 @@ func main() {
 		}
 
 		ep := vips.NewJpegExportParams()
-		ep.Quality = 120
+		ep.Quality = 100
 
 		out, _, err := imageFile.ExportJpeg(ep)
 		if err != nil {
