@@ -8,8 +8,8 @@ import (
 	"github.com/buckket/go-blurhash"
 	"github.com/davidbyttow/govips/v2/vips"
 	"hash/fnv"
-	"io"
 	"image/jpeg"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -218,36 +218,13 @@ func main() {
 			return
 		}
 
-		h := hash(url)
-		name := h + ".jpg"
-		file := tmp + "/" + name
-
 		res, err := http.Get(url)
 		if err != nil {
 			log.Fatal(err)
 		}
 		defer res.Body.Close()
 
-		out, err := os.Create(file)
-		if err != nil {
-			fmt.Fprintf(w, "cannot creat image file : %s", err)
-			return
-		}
-		defer out.Close()
-
-		_, err = io.Copy(out, res.Body)
-		if err != nil {
-			fmt.Fprintf(w, "cannot copy url body to image file : %s", err)
-			return
-		}
-
-		imageFile, err := os.Open(out.Name())
-		if err != nil {
-			fmt.Fprintf(w, "cannot open image file : %s", err)
-			return
-		}
-
-		loadedImage, err := jpeg.Decode(imageFile)
+		loadedImage, err := jpeg.Decode(res.Body)
 		if err != nil {
 			fmt.Fprintf(w, "cannot decode image : %s", err)
 			return
