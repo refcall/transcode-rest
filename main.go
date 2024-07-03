@@ -5,8 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/buckket/go-blurhash"
-	"github.com/davidbyttow/govips/v2/vips"
 	"hash/fnv"
 	"image/jpeg"
 	"io"
@@ -16,6 +14,9 @@ import (
 	"os/exec"
 	"strconv"
 	"time"
+
+	"github.com/buckket/go-blurhash"
+	"github.com/davidbyttow/govips/v2/vips"
 )
 
 var (
