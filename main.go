@@ -252,14 +252,12 @@ func main() {
 			fmt.Fprintf(w, "cannot decode image : %s", err)
 			return
 		}
-		height := loadedImage.Bounds().Dy()
-		width := loadedImage.Bounds().Dx()
 
 		str, _ := blurhash.Encode(4, 3, loadedImage)
 		blur := Blur{
 			Code:   str,
-			Height: height,
-			Width:  width,
+			Height: loadedImage.Bounds().Dy(),
+			Width:  loadedImage.Bounds().Dx(),
 		}
 
 		w.Header().Set("Content-Type", "application/json")
