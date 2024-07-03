@@ -1,10 +1,13 @@
 package main
 
+import "C"
 import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/davidbyttow/govips/v2/vips"
 	"hash/fnv"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -23,6 +26,13 @@ var (
 	// BuildTime is set at compilation
 	BuildTime = "unknown"
 )
+
+type PdfInfo struct {
+	URL    string
+	Pages  int
+	Height int
+	Width  int
+}
 
 func main() {
 	fmt.Println("transcode-rest")
@@ -131,7 +141,7 @@ func main() {
 		http.ServeContent(w, r, name, time.Now(), f)
 	})
 
-	http.HandleFunc("/thumbnail", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/video/thumbnail", func(w http.ResponseWriter, r *http.Request) {
 		url := r.URL.Query().Get("url")
 		if url == "" {
 			w.WriteHeader(http.StatusBadRequest)
@@ -190,6 +200,93 @@ func main() {
 		}
 		defer f.Close()
 		http.ServeContent(w, r, name, time.Now(), f)
+	})
+
+	http.HandleFunc("/pdf/info", func(w http.ResponseWriter, r *http.Request) {
+		url := r.URL.Query().Get("url")
+		if url == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "url param needed")
+			return
+		}
+
+		res, err := http.Get(url)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer res.Body.Close()
+
+		inputImage, err := vips.NewImageFromReader(res.Body)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		pdfInfo := PdfInfo{
+			URL:    url,
+			Pages:  inputImage.Pages(),
+			Height: inputImage.Height(),
+			Width:  inputImage.Width(),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		err = json.NewEncoder(w).Encode(pdfInfo)
+		if err != nil {
+			http.Error(w, "Failed to encode JSON: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	})
+
+	http.HandleFunc("/pdf/thumbnail", func(w http.ResponseWriter, r *http.Request) {
+		url := r.URL.Query().Get("url")
+		if url == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "url param needed")
+			return
+		}
+		page := r.URL.Query().Get("page")
+		if page == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "page param needed")
+			return
+		}
+		intPage, _ := strconv.Atoi(page)
+
+		res, err := http.Get(url)
+		if err != nil {
+			fmt.Fprintf(w, "cannot get url body: %s", err.Error())
+			return
+		}
+		defer res.Body.Close()
+
+		bytesRes, err := io.ReadAll(res.Body)
+		if err != nil {
+			fmt.Fprintf(w, "cannot extract bytes from url body: %s", err.Error())
+			return
+		}
+
+		ip := vips.NewImportParams()
+		ip.Page.Set(intPage)
+		ip.Density.Set(120)
+
+		imageFile, err := vips.LoadImageFromBuffer(bytesRes, ip)
+		if err != nil {
+			fmt.Fprintf(w, "cannot load image file from url bytes and page: %s", err.Error())
+			return
+		}
+
+		ep := vips.NewJpegExportParams()
+		ep.Quality = 100
+
+		out, _, err := imageFile.ExportJpeg(ep)
+		if err != nil {
+			fmt.Fprintf(w, "cannot export file to jpeg: %s", err.Error())
+			return
+		}
+		w.Header().Set("Content-Type", "image/jpeg")
+		w.Write(out)
+		if err != nil {
+			http.Error(w, "failed to convert pdf to jpeg: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 	})
 
 	log.Fatal(http.ListenAndServe(getEnv("LISTEN_PORT", ":8080"), nil))
