@@ -5,10 +5,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/buckket/go-blurhash"
 	"github.com/davidbyttow/govips/v2/vips"
 	"hash/fnv"
-	"image/jpeg"
 	"io"
 	"log"
 	"net/http"
@@ -289,73 +287,6 @@ func main() {
 			http.Error(w, "failed to convert pdf to jpeg: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-	})
-
-	type Blur struct {
-		Code   string
-		Height int
-		Width  int
-	}
-
-	http.HandleFunc("/blur", func(w http.ResponseWriter, r *http.Request) {
-		url := r.URL.Query().Get("url")
-		if url == "" {
-			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprintf(w, "url param needed")
-			return
-		}
-
-		h := hash(url)
-		name := h + ".jpg"
-		file := tmp + "/" + name
-
-		res, err := http.Get(url)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer res.Body.Close()
-
-		out, err := os.Create(file)
-		if err != nil {
-			fmt.Fprintf(w, "cannot creat image file : %s", err)
-			return
-		}
-		defer out.Close()
-
-		_, err = io.Copy(out, res.Body)
-		if err != nil {
-			fmt.Fprintf(w, "cannot copy url body to image file : %s", err)
-			return
-		}
-
-		imageFile, err := os.Open(out.Name())
-		if err != nil {
-			fmt.Fprintf(w, "cannot open image file : %s", err)
-			return
-		}
-
-		loadedImage, err := jpeg.Decode(imageFile)
-		if err != nil {
-			fmt.Fprintf(w, "cannot decode image : %s", err)
-			return
-		}
-		height := loadedImage.Bounds().Dy()
-		width := loadedImage.Bounds().Dx()
-
-		str, _ := blurhash.Encode(4, 3, loadedImage)
-		blur := Blur{
-			Code:   str,
-			Height: height,
-			Width:  width,
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		err = json.NewEncoder(w).Encode(blur)
-		if err != nil {
-			http.Error(w, "Failed to encode JSON: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-
 	})
 
 	log.Fatal(http.ListenAndServe(getEnv("LISTEN_PORT", ":8080"), nil))
