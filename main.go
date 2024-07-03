@@ -5,14 +5,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/davidbyttow/govips/v2/vips"
 	"hash/fnv"
-	"io"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -28,8 +27,10 @@ var (
 )
 
 type PdfInfo struct {
-	Pages int
-	URL   string
+	URL    string
+	Pages  int
+	Height int
+	Width  int
 }
 
 func main() {
@@ -208,42 +209,22 @@ func main() {
 			return
 		}
 
-		h := hash(url)
-		pdfFile := tmp + "/" + h + ".pdf"
-
 		res, err := http.Get(url)
 		if err != nil {
 			log.Fatal(err)
 		}
 		defer res.Body.Close()
 
-		out, err := os.Create(pdfFile)
+		inputImage, err := vips.NewImageFromReader(res.Body)
 		if err != nil {
 			log.Fatal(err)
 		}
-		defer out.Close()
-
-		_, err = io.Copy(out, res.Body)
-
-		log.Println("distant pdf ", url, " saved to ", out)
-
-		getPagesCmd := exec.Command(getEnv("VIPS_HEADER_PATH", "vipsheader"), "-f", "n-pages", out.Name())
-		pagesOutput, err := getPagesCmd.Output()
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "cannot get page count: %s", err.Error())
-			return
-		}
-		numPages, err := strconv.Atoi(strings.TrimSpace(string(pagesOutput)))
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "invalid page count: %s", err.Error())
-			return
-		}
 
 		pdfInfo := PdfInfo{
-			Pages: numPages,
-			URL:   url,
+			URL:    url,
+			Pages:  inputImage.Pages(),
+			Height: inputImage.Height(),
+			Width:  inputImage.Width(),
 		}
 		w.Header().Set("Content-Type", "application/json")
 		err = json.NewEncoder(w).Encode(pdfInfo)
