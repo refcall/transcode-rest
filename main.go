@@ -310,7 +310,7 @@ func main() {
 		imageFile, err := vips.LoadImageFromBuffer(bytesRes, ip)
 		log.Println("loading image from buffer")
 		if err != nil {
-			http.Error(w, "cannot load image file from url bytes and page: "+err.Error(), http.StatusInternalServerError)
+			http.Error(w, "cannot load image file from url bytes and page: "+err.Error(), http.StatusBadRequest)
 			return
 		}
 
