@@ -318,6 +318,7 @@ func main() {
 		ep.Quality = 100
 
 		out, _, err := imageFile.ExportJpeg(ep)
+		log.Println("exporting jpeg")
 		if err != nil {
 			http.Error(w, "cannot export file to jpeg: "+err.Error(), http.StatusInternalServerError)
 			return
