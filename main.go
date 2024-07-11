@@ -244,7 +244,7 @@ func main() {
 		url := r.URL.Query().Get("url")
 		if url == "" {
 			w.WriteHeader(http.StatusBadRequest)
-			http.Error(w, "url param needed : ", http.StatusBadRequest)
+			http.Error(w, "url param needed: ", http.StatusBadRequest)
 			return
 		}
 
@@ -257,7 +257,7 @@ func main() {
 
 		inputImage, err := vips.NewImageFromReader(res.Body)
 		if err != nil {
-			http.Error(w, "cannot create a bimg image from reader :"+err.Error(), http.StatusBadRequest)
+			http.Error(w, "cannot create a bimg image from reader: "+err.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -291,7 +291,7 @@ func main() {
 
 		res, err := http.Get(url)
 		if err != nil {
-			http.Error(w, "page param needed : "+err.Error(), http.StatusBadRequest)
+			http.Error(w, "page param needed: "+err.Error(), http.StatusBadRequest)
 			return
 		}
 		defer res.Body.Close()
@@ -299,7 +299,7 @@ func main() {
 
 		bytesRes, err := io.ReadAll(res.Body)
 		if err != nil {
-			http.Error(w, "cannot extract bytes from url body : "+err.Error(), http.StatusInternalServerError)
+			http.Error(w, "cannot extract bytes from url body: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 
