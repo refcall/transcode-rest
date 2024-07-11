@@ -281,6 +281,7 @@ func main() {
 			http.Error(w, "url param needed", http.StatusBadRequest)
 			return
 		}
+		log.Println("thumbnail", url)
 		page := r.URL.Query().Get("page")
 		if page == "" {
 			http.Error(w, "page param needed", http.StatusBadRequest)
@@ -294,6 +295,7 @@ func main() {
 			return
 		}
 		defer res.Body.Close()
+		log.Println("res statut", res.Status, "res proto", res.Proto)
 
 		bytesRes, err := io.ReadAll(res.Body)
 		if err != nil {
@@ -306,6 +308,7 @@ func main() {
 		ip.Density.Set(120)
 
 		imageFile, err := vips.LoadImageFromBuffer(bytesRes, ip)
+		log.Println("loading image from buffer")
 		if err != nil {
 			http.Error(w, "cannot load image file from url bytes and page: "+err.Error(), http.StatusInternalServerError)
 			return
