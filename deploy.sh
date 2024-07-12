@@ -20,3 +20,4 @@ docker buildx build --platform linux/amd64 -t $IMAGE_NAME:$LATEST_COMMIT_HASH .
 
 echo "Pushing to GitHub Packages..."
 docker push $IMAGE_NAME:$LATEST_COMMIT_HASH
+
