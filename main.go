@@ -51,6 +51,9 @@ func main() {
 	fmt.Println()
 
 	tmp := getEnv("STORAGE_DIRECTORY", os.TempDir())
+	vips.LoggingSettings(func(messageDomain string, messageLevel vips.LogLevel, message string) {
+		log.Printf("%v: %v", messageDomain, message)
+	}, vips.LogLevelWarning)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Type", "application/json")
@@ -324,7 +327,7 @@ func main() {
 			return
 		}
 		w.Header().Set("Content-Type", "image/jpeg")
-		w.Write(out)
+		_, err = w.Write(out)
 		if err != nil {
 			http.Error(w, "failed to convert pdf to jpeg: "+err.Error(), http.StatusInternalServerError)
 			return
