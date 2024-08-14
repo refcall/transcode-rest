@@ -7,7 +7,9 @@ ARG GIT_BRANCH=none
 ARG RELEASE=none
 
 WORKDIR /app
-COPY . .
+COPY go.mod .
+COPY go.sum .
+COPY *.go .
 RUN go build -ldflags="-X 'main.GitHash=$GIT_SHA' -X 'main.GitBranch=$GIT_BRANCH' -X 'main.BuildTime=`date`'" -o /backend
 
 FROM linuxserver/ffmpeg:7.0.1

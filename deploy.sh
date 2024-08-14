@@ -1,7 +1,7 @@
 #!/bin/bash
 
 read -p "GitHub username: " GITHUB_USERNAME
-read -sp "GitHub token: " GITHUB_TOKEN
+read -sp "GitHub token: ⚿ " GITHUB_TOKEN
 echo
 
 REPO_NAME="transcode-rest"
@@ -16,8 +16,4 @@ LATEST_COMMIT_HASH=$(git log -1 --format="%H")
 
 echo "Building docker image with tag: $LATEST_COMMIT_HASH..."
 docker buildx create --use
-docker buildx build --platform linux/amd64 -t $IMAGE_NAME:$LATEST_COMMIT_HASH .
-
-echo "Pushing to GitHub Packages..."
-docker push $IMAGE_NAME:$LATEST_COMMIT_HASH
-
+docker buildx build --push --platform linux/amd64 -t $IMAGE_NAME:$LATEST_COMMIT_HASH .
