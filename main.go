@@ -6,7 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
-	"image/jpeg"
+	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
 	"io"
 	"log"
 	"net/http"
@@ -221,7 +224,7 @@ func main() {
 		}
 		defer res.Body.Close()
 
-		loadedImage, err := jpeg.Decode(res.Body)
+		loadedImage, _, err := image.Decode(res.Body)
 		if err != nil {
 			http.Error(w, "cannot decode image: "+err.Error(), http.StatusUnprocessableEntity)
 			return
