@@ -60,6 +60,7 @@ func main() {
 	vips.LoggingSettings(func(messageDomain string, messageLevel vips.LogLevel, message string) {
 		log.Printf("%v: %v", messageDomain, message)
 	}, vips.LogLevelWarning)
+	vips.Startup(nil)
 
 	go func() {
 		keepFilesDuration, err := time.ParseDuration(getEnv("STORAGE_DURATION", "10m"))
@@ -105,6 +106,26 @@ func main() {
 			return
 		}
 
+		h := hash(url)
+		name := h + ".mp4"
+		file := tmp + "/" + name
+
+		log.Println("transcode", url, "to", file)
+
+		if stat, err := os.Stat(file); err == nil {
+			log.Println("  already exist")
+			f, err := os.Open(file)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprintf(w, "cannot open file: %s", err.Error())
+				return
+			}
+			defer f.Close()
+			http.ServeContent(w, r, name, stat.ModTime(), f)
+			tempFiles[file] = time.Now().Unix()
+			return
+		}
+
 		p, err := probe(url)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -126,25 +147,8 @@ func main() {
 			}
 		}
 
-		h := hash(url)
-		name := h + ".mp4"
-		file := tmp + "/" + name
+		log.Println("  start transcode", url, "with bitrate", bitrate, "to", file)
 
-		if stat, err := os.Stat(file); err == nil {
-			log.Println("already exist")
-			f, err := os.Open(file)
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Fprintf(w, "cannot open file: %s", err.Error())
-				return
-			}
-			defer f.Close()
-			http.ServeContent(w, r, name, stat.ModTime(), f)
-			tempFiles[file] = time.Now().Unix()
-			return
-		}
-
-		log.Println("transcode", url, "with bitrate", bitrate, "to", file)
 		args := []string{
 			"-i", url,
 		}
@@ -173,7 +177,7 @@ func main() {
 			return
 		}
 
-		log.Println("serve file", file)
+		log.Println("  serve file", file)
 		f, err := os.Open(file)
 		if err != nil {
 			http.Error(w, "cannot open file: "+err.Error(), http.StatusInternalServerError)
@@ -196,8 +200,10 @@ func main() {
 		name := h + ".jpg"
 		file := tmp + "/" + name
 
+		log.Println("video thumbnail", url, "to", file)
+
 		if stat, err := os.Stat(file); err == nil {
-			log.Println("already exist")
+			log.Println("  already exist")
 			f, err := os.Open(file)
 			if err != nil {
 				http.Error(w, "cannot open file: "+err.Error(), http.StatusInternalServerError)
@@ -209,7 +215,6 @@ func main() {
 			return
 		}
 
-		log.Println("transcode for thumbnail", url, "to", file)
 		args := []string{
 			"-y",
 			"-i", url,
@@ -232,7 +237,7 @@ func main() {
 			return
 		}
 
-		log.Println("serve file", file)
+		log.Println(" . serve file", file)
 		f, err := os.Open(file)
 		if err != nil {
 			http.Error(w, "cannot open file: "+err.Error(), http.StatusInternalServerError)
@@ -252,6 +257,8 @@ func main() {
 			return
 		}
 
+		log.Println("blur", url)
+
 		res, err := http.Get(url)
 		if err != nil {
 			http.Error(w, "cannot get url: "+err.Error(), http.StatusBadRequest)
@@ -264,7 +271,7 @@ func main() {
 			return
 		}
 
-		log.Println("encode image of", loadedImage.Bounds().Dy(), loadedImage.Bounds().Dx())
+		log.Println("  encode image of", loadedImage.Bounds().Dy(), loadedImage.Bounds().Dx())
 		str, _ := blurhash.Encode(4, 3, loadedImage)
 		blur := Blur{
 			Code:   str,
@@ -288,6 +295,8 @@ func main() {
 			http.Error(w, "url param needed: ", http.StatusBadRequest)
 			return
 		}
+
+		log.Println("pdf info", url)
 
 		res, err := http.Get(url)
 		if err != nil {
@@ -323,7 +332,6 @@ func main() {
 			http.Error(w, "url param needed", http.StatusBadRequest)
 			return
 		}
-		log.Println("thumbnail", url)
 		page := r.URL.Query().Get("page")
 		if page == "" {
 			http.Error(w, "page param needed", http.StatusBadRequest)
@@ -331,13 +339,15 @@ func main() {
 		}
 		intPage, _ := strconv.Atoi(page)
 
+		log.Println("pdf thumbnail", url, "page", intPage)
+
 		res, err := http.Get(url)
 		if err != nil {
-			http.Error(w, "page param needed: "+err.Error(), http.StatusBadRequest)
+			http.Error(w, "cannot get url: "+err.Error(), http.StatusBadRequest)
 			return
 		}
 		defer res.Body.Close()
-		log.Println("res statut", res.Status, "res proto", res.Proto)
+		log.Println("  res status", res.Status)
 
 		bytesRes, err := io.ReadAll(res.Body)
 		if err != nil {
@@ -349,8 +359,8 @@ func main() {
 		ip.Page.Set(intPage)
 		ip.Density.Set(120)
 
+		log.Println("  loading image from buffer")
 		imageFile, err := vips.LoadImageFromBuffer(bytesRes, ip)
-		log.Println("loading image from buffer")
 		if err != nil {
 			http.Error(w, "cannot load image file from url bytes and page: "+err.Error(), http.StatusBadRequest)
 			return
@@ -358,14 +368,15 @@ func main() {
 		defer imageFile.Close()
 
 		ep := vips.NewJpegExportParams()
-		ep.Quality = 100
+		ep.Quality = 80
 
+		log.Println("  exporting jpeg")
 		out, _, err := imageFile.ExportJpeg(ep)
-		log.Println("exporting jpeg")
 		if err != nil {
 			http.Error(w, "cannot export file to jpeg: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
+
 		w.Header().Set("Content-Type", "image/jpeg")
 		_, err = w.Write(out)
 		if err != nil {
