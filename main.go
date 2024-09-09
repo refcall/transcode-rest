@@ -46,6 +46,8 @@ type Blur struct {
 	Width  int
 }
 
+var tempFiles = map[string]int64{}
+
 func main() {
 	fmt.Println("transcode-rest")
 	fmt.Println("git hash: " + GitHash)
@@ -57,6 +59,30 @@ func main() {
 	vips.LoggingSettings(func(messageDomain string, messageLevel vips.LogLevel, message string) {
 		log.Printf("%v: %v", messageDomain, message)
 	}, vips.LogLevelWarning)
+
+	go func() {
+		keepFilesDuration, err := time.ParseDuration(getEnv("STORAGE_DURATION", "10m"))
+		if err != nil {
+			log.Fatal("duration from STORAGE_DURATION is invalid")
+		}
+		log.Printf("auto delete files older than %s", keepFilesDuration.String())
+
+		for {
+			log.Println("cleanup files")
+			now := time.Now()
+			for k, v := range tempFiles {
+				if time.Unix(v, 0).Add(keepFilesDuration).Before(now) {
+					log.Println("remove", k)
+					if err := os.Remove(k); err != nil {
+						log.Fatalf("cannot remove file %s", k)
+					}
+					delete(tempFiles, k)
+				}
+			}
+			log.Println("cleanup done")
+			time.Sleep(1 * time.Minute)
+		}
+	}()
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Type", "application/json")
@@ -103,7 +129,7 @@ func main() {
 		name := h + ".mp4"
 		file := tmp + "/" + name
 
-		if _, err := os.Stat(file); err == nil {
+		if stat, err := os.Stat(file); err == nil {
 			log.Println("already exist")
 			f, err := os.Open(file)
 			if err != nil {
@@ -112,7 +138,8 @@ func main() {
 				return
 			}
 			defer f.Close()
-			http.ServeContent(w, r, name, time.Now(), f)
+			http.ServeContent(w, r, name, stat.ModTime(), f)
+			tempFiles[file] = time.Now().Unix()
 			return
 		}
 
@@ -145,13 +172,15 @@ func main() {
 			return
 		}
 
-		log.Println("serve file")
+		log.Println("serve file", file)
 		f, err := os.Open(file)
 		if err != nil {
 			http.Error(w, "cannot open file: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		defer f.Close()
+
+		tempFiles[file] = time.Now().Unix()
 		http.ServeContent(w, r, name, time.Now(), f)
 	})
 
@@ -166,7 +195,7 @@ func main() {
 		name := h + ".jpg"
 		file := tmp + "/" + name
 
-		if _, err := os.Stat(file); err == nil {
+		if stat, err := os.Stat(file); err == nil {
 			log.Println("already exist")
 			f, err := os.Open(file)
 			if err != nil {
@@ -174,7 +203,8 @@ func main() {
 				return
 			}
 			defer f.Close()
-			http.ServeContent(w, r, name, time.Now(), f)
+			http.ServeContent(w, r, name, stat.ModTime(), f)
+			tempFiles[file] = time.Now().Unix()
 			return
 		}
 
@@ -201,13 +231,15 @@ func main() {
 			return
 		}
 
-		log.Println("serve file")
+		log.Println("serve file", file)
 		f, err := os.Open(file)
 		if err != nil {
 			http.Error(w, "cannot open file: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		defer f.Close()
+
+		tempFiles[file] = time.Now().Unix()
 		http.ServeContent(w, r, name, time.Now(), f)
 	})
 

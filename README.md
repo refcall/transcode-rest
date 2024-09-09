@@ -7,6 +7,7 @@ Very simple API to transcode files or ffmpeg supported muxers (like HLS or MPEG-
 Everything is optional
 
 - STORAGE_DIRECTORY will store transcoded files with hash of the URL provided, otherwise a tmp dir will be used
+- STORAGE_DURATION is the time storage files will be kept before deletion, `10m` by default
 - FFPROBE_PATH to overwrite `$PATH` binary of `ffmpeg`
 - FFMPEG_PATH to overwrite `$PATH` binary of `ffprobe`
 - LISTEN_PORT of the API otherwise `:8080`
