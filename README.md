@@ -20,3 +20,7 @@ Everything is optional
 - `/pdf/thumbnail?page=0&url=http%3A%2F%2Fgoodone.fr%2Fhls.m3u8` to convert a pdf page into a .jpg image
 - `/video/thumbnail?url=http%3A%2F%2Fgoodone.fr%2Fhls.m3u8` to get the first frame in .jpg from video
 - `/blur?url=http%3A%2F%2Fgoodone.fr%2Fhls.m3u8` to generate a blur hash from an image
+
+## Bonus
+
+Profiling tools are enabled on path `/debug/pprof/`

@@ -10,12 +10,12 @@ WORKDIR /app
 COPY go.mod .
 COPY go.sum .
 COPY *.go .
-RUN go build -ldflags="-X 'main.GitHash=$GIT_SHA' -X 'main.GitBranch=$GIT_BRANCH' -X 'main.BuildTime=`date`'" -o /backend
+RUN go build -ldflags="-X 'main.GitHash=$GIT_SHA' -X 'main.GitBranch=$GIT_BRANCH' -X 'main.BuildTime=`date`'" -o /transcode-rest
 
 FROM linuxserver/ffmpeg:7.0.1
 
 RUN apt update; apt install -y libvips42
 
 WORKDIR /
-COPY --from=build /backend /backend
-ENTRYPOINT ["/backend"]
+COPY --from=build /transcode-rest /transcode-rest
+ENTRYPOINT ["/transcode-rest"]

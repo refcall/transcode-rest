@@ -13,6 +13,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/exec"
 	"strconv"
@@ -208,7 +209,7 @@ func main() {
 			return
 		}
 
-		log.Println("transcode", url, "to", file)
+		log.Println("transcode for thumbnail", url, "to", file)
 		args := []string{
 			"-y",
 			"-i", url,
@@ -243,6 +244,7 @@ func main() {
 		http.ServeContent(w, r, name, time.Now(), f)
 	})
 
+	// this leaks for sure
 	http.HandleFunc("/blur", func(w http.ResponseWriter, r *http.Request) {
 		url := r.URL.Query().Get("url")
 		if url == "" {
@@ -262,6 +264,7 @@ func main() {
 			return
 		}
 
+		log.Println("encode image of", loadedImage.Bounds().Dy(), loadedImage.Bounds().Dx())
 		str, _ := blurhash.Encode(4, 3, loadedImage)
 		blur := Blur{
 			Code:   str,
