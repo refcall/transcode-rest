@@ -298,6 +298,7 @@ func main() {
 			http.Error(w, "cannot create a bimg image from reader: "+err.Error(), http.StatusBadRequest)
 			return
 		}
+		defer inputImage.Close()
 
 		pdfInfo := PdfInfo{
 			URL:    url,
@@ -351,6 +352,7 @@ func main() {
 			http.Error(w, "cannot load image file from url bytes and page: "+err.Error(), http.StatusBadRequest)
 			return
 		}
+		defer imageFile.Close()
 
 		ep := vips.NewJpegExportParams()
 		ep.Quality = 100
