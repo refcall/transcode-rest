@@ -60,7 +60,15 @@ func main() {
 	vips.LoggingSettings(func(messageDomain string, messageLevel vips.LogLevel, message string) {
 		log.Printf("%v: %v", messageDomain, message)
 	}, vips.LogLevelWarning)
-	vips.Startup(nil)
+	vips.Startup(&vips.Config{
+		ConcurrencyLevel: 4,
+		MaxCacheFiles:    1,
+		MaxCacheMem:      1,
+		MaxCacheSize:     1,
+		ReportLeaks:      true,
+		CacheTrace:       false,
+		CollectStats:     false,
+	})
 
 	go func() {
 		keepFilesDuration, err := time.ParseDuration(getEnv("STORAGE_DURATION", "10m"))
@@ -147,7 +155,7 @@ func main() {
 			}
 		}
 
-		log.Println("  start transcode", url, "with bitrate", bitrate, "to", file)
+		log.Println("  transcode start", url, "with bitrate", bitrate, "to", file)
 
 		args := []string{
 			"-i", url,
@@ -237,7 +245,7 @@ func main() {
 			return
 		}
 
-		log.Println(" . serve file", file)
+		log.Println("  video thumbnail serve file", file)
 		f, err := os.Open(file)
 		if err != nil {
 			http.Error(w, "cannot open file: "+err.Error(), http.StatusInternalServerError)
@@ -271,21 +279,22 @@ func main() {
 			return
 		}
 
-		log.Println("  encode image of", loadedImage.Bounds().Dy(), loadedImage.Bounds().Dx())
+		log.Println("  blur encode image of", loadedImage.Bounds().Dy(), loadedImage.Bounds().Dx())
 		str, _ := blurhash.Encode(4, 3, loadedImage)
-		blur := Blur{
+		blur := &Blur{
 			Code:   str,
 			Height: loadedImage.Bounds().Dy(),
 			Width:  loadedImage.Bounds().Dx(),
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		err = json.NewEncoder(w).Encode(blur)
+		b, err := json.Marshal(blur)
 		if err != nil {
 			http.Error(w, "Failed to encode JSON: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(b)
 	})
 
 	http.HandleFunc("/pdf/info", func(w http.ResponseWriter, r *http.Request) {
@@ -312,18 +321,22 @@ func main() {
 		}
 		defer inputImage.Close()
 
-		pdfInfo := PdfInfo{
+		pdfInfo := &PdfInfo{
 			URL:    url,
 			Pages:  inputImage.Pages(),
 			Height: inputImage.Height(),
 			Width:  inputImage.Width(),
 		}
-		w.Header().Set("Content-Type", "application/json")
-		err = json.NewEncoder(w).Encode(pdfInfo)
+
+		b, err := json.Marshal(pdfInfo)
 		if err != nil {
 			http.Error(w, "Failed to encode JSON: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(b)
+
 	})
 
 	http.HandleFunc("/pdf/thumbnail", func(w http.ResponseWriter, r *http.Request) {
@@ -347,7 +360,7 @@ func main() {
 			return
 		}
 		defer res.Body.Close()
-		log.Println("  res status", res.Status)
+		log.Println("  pdf thumbnail res status", res.Status)
 
 		bytesRes, err := io.ReadAll(res.Body)
 		if err != nil {
@@ -359,7 +372,7 @@ func main() {
 		ip.Page.Set(intPage)
 		ip.Density.Set(120)
 
-		log.Println("  loading image from buffer")
+		log.Println("  pdf thumbnail loading image from buffer")
 		imageFile, err := vips.LoadImageFromBuffer(bytesRes, ip)
 		if err != nil {
 			http.Error(w, "cannot load image file from url bytes and page: "+err.Error(), http.StatusBadRequest)
@@ -370,7 +383,7 @@ func main() {
 		ep := vips.NewJpegExportParams()
 		ep.Quality = 80
 
-		log.Println("  exporting jpeg")
+		log.Println("  pdf thumbnail exporting jpeg")
 		out, _, err := imageFile.ExportJpeg(ep)
 		if err != nil {
 			http.Error(w, "cannot export file to jpeg: "+err.Error(), http.StatusInternalServerError)
